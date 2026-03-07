@@ -1,0 +1,46 @@
+{
+  "name": "pocketbase-mcp",
+  "author": "Matheus Gaspechak",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Gaspechak/pocketbase-mcp.git"
+  },
+  "version": "1.0.0",
+  "description": "MCP server for PocketBase — full database management from any AI assistant",
+  "type": "module",
+  "bin": {
+    "pocketbase-mcp": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "node --loader ts-node/esm src/index.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "pocketbase",
+    "model-context-protocol",
+    "ai",
+    "llm",
+    "claude",
+    "copilot",
+    "database",
+    "baas"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.10.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.5",
+    "typescript": "^5.7.0"
+  }
+}
