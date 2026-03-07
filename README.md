@@ -1,4 +1,4 @@
-# pocketbase-mcp
+# gaspechak-pocketbase-mcp
 
 MCP server for [PocketBase](https://pocketbase.io) — full database management from any AI assistant.
 
@@ -7,13 +7,13 @@ Connect Claude, GitHub Copilot, Cursor, Windsurf, or any MCP-compatible AI tool 
 ## Quick Start
 
 ```bash
-npx pocketbase-mcp
+npx gaspechak-pocketbase-mcp
 ```
 
 Set environment variables to connect to your PocketBase instance:
 
 ```bash
-PB_URL=http://127.0.0.1:8090 PB_EMAIL=admin@example.com PB_PASSWORD=yourpassword npx pocketbase-mcp
+PB_URL=http://127.0.0.1:8090 PB_EMAIL=admin@example.com PB_PASSWORD=yourpassword npx gaspechak-pocketbase-mcp
 ```
 
 | Variable      | Description                          | Default                  |
@@ -84,7 +84,7 @@ Add to `claude_desktop_config.json`:
   "mcpServers": {
     "pocketbase": {
       "command": "npx",
-      "args": ["-y", "pocketbase-mcp"],
+      "args": ["-y", "gaspechak-pocketbase-mcp"],
       "env": {
         "PB_URL": "http://127.0.0.1:8090",
         "PB_EMAIL": "admin@example.com",
@@ -105,7 +105,7 @@ Add to `.vscode/mcp.json`:
     "pocketbase": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "pocketbase-mcp"],
+      "args": ["-y", "gaspechak-pocketbase-mcp"],
       "env": {
         "PB_URL": "http://127.0.0.1:8090",
         "PB_EMAIL": "admin@example.com",
@@ -125,7 +125,7 @@ Add to Cursor Settings → MCP Servers:
   "mcpServers": {
     "pocketbase": {
       "command": "npx",
-      "args": ["-y", "pocketbase-mcp"],
+      "args": ["-y", "gaspechak-pocketbase-mcp"],
       "env": {
         "PB_URL": "http://127.0.0.1:8090",
         "PB_EMAIL": "admin@example.com",
@@ -145,7 +145,7 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
   "mcpServers": {
     "pocketbase": {
       "command": "npx",
-      "args": ["-y", "pocketbase-mcp"],
+      "args": ["-y", "gaspechak-pocketbase-mcp"],
       "env": {
         "PB_URL": "http://127.0.0.1:8090",
         "PB_EMAIL": "admin@example.com",
