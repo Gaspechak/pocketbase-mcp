@@ -8,10 +8,16 @@ export function register(server: McpServer) {
     description: [
       "List records from a collection. Use filter to test API rules and query conditions.",
       "FILTER SYNTAX: 'status = \"active\"' | 'age > 18' | 'tags ~ \"sports\"' | 'created >= \"2024-01-01\"'",
+      "OPERATORS: = != > >= < <= ~ !~ (exact) | ?= ?!= ?> ?~ (any-match for relations)",
+      "LOGIC: && (AND), || (OR)",
+      "DATE MACROS: @now, @todayStart, @todayEnd, @monthStart, @monthEnd, @yearStart, @yearEnd",
+      "  Examples: 'created >= @todayStart' | 'expires < @now' | 'created >= @monthStart'",
+      "FIELD MODIFIERS: tags:length > 3, name:lower = \"john\", avatar:isset = true, tags:each ~ \"sport\"",
+      "RELATION TRAVERSAL: 'author.name ~ \"João\"' | 'author.company.name = \"Acme\"' (up to 6 levels)",
+      "BACK-RELATIONS: 'comments_via_post.status = \"approved\"' — filter by records that reference this one",
       "SORT: '-created' (desc) | '+name' or 'name' (asc) | '-created,name' (multiple)",
-      "EXPAND: 'relationField' | 'relationField.nestedRelation' (up to 6 levels deep)",
-      "BACK-RELATIONS: 'comments_via_post' expands all comments where post=this record",
-      "FIELDS: 'id,name,status' to limit returned fields (saves tokens)",
+      "EXPAND: 'author' | 'author,category' | 'author.company' | 'comments_via_post' (back-relation expand)",
+      "FIELDS: 'id,name,status' to limit returned fields (saves tokens). 'id,expand.author.name' for expanded.",
       "Set skipTotal=true for faster queries when you don't need pagination info.",
     ].join(" "),
     inputSchema: {
@@ -115,17 +121,17 @@ export function register(server: McpServer) {
                    .describe("Array of record data objects. Max 200 per call."),
     },
   }, async ({ collection, records }) => {
-    const results = await Promise.all(
+    const settled = await Promise.allSettled(
       records.map(async (data, i) => {
         const r = await pbFetch(`/api/collections/${collection}/records`, {
           method: "POST",
           body: JSON.stringify(data),
         });
-        return r.ok
-          ? { index: i, ok: true, id: (r.data as Record<string, unknown>).id }
-          : { index: i, ok: false, error: r.error, status: r.status };
+        if (r.ok) return { index: i, ok: true as const, id: (r.data as Record<string, unknown>).id };
+        return { index: i, ok: false as const, error: r.error, detail: r.data, status: r.status };
       })
     );
+    const results = settled.map(s => s.status === "fulfilled" ? s.value : { ok: false, error: String((s as PromiseRejectedResult).reason) });
     const created = results.filter(r => r.ok);
     const failed  = results.filter(r => !r.ok);
     return out({ total: records.length, created: created.length, failed: failed.length, results });
@@ -143,17 +149,17 @@ export function register(server: McpServer) {
                    .describe("Array of objects with 'id' + fields to update. Max 200 per call."),
     },
   }, async ({ collection, records }) => {
-    const results = await Promise.all(
+    const settled = await Promise.allSettled(
       records.map(async ({ id, ...data }, i) => {
         const r = await pbFetch(`/api/collections/${collection}/records/${id}`, {
           method: "PATCH",
           body: JSON.stringify(data),
         });
-        return r.ok
-          ? { index: i, ok: true, id }
-          : { index: i, ok: false, id, error: r.error, status: r.status };
+        if (r.ok) return { index: i, ok: true as const, id };
+        return { index: i, ok: false as const, id, error: r.error, detail: r.data, status: r.status };
       })
     );
+    const results = settled.map(s => s.status === "fulfilled" ? s.value : { ok: false, error: String((s as PromiseRejectedResult).reason) });
     const updated = results.filter(r => r.ok);
     const failed  = results.filter(r => !r.ok);
     return out({ total: records.length, updated: updated.length, failed: failed.length, results });
@@ -170,14 +176,14 @@ export function register(server: McpServer) {
                    .describe("Array of record ids to delete. Max 200 per call."),
     },
   }, async ({ collection, ids }) => {
-    const results = await Promise.all(
+    const settled = await Promise.allSettled(
       ids.map(async (id, i) => {
         const r = await pbFetch(`/api/collections/${collection}/records/${id}`, { method: "DELETE" });
-        return (r.status === 204 || r.ok)
-          ? { index: i, ok: true, id }
-          : { index: i, ok: false, id, error: r.error, status: r.status };
+        if (r.status === 204 || r.ok) return { index: i, ok: true as const, id };
+        return { index: i, ok: false as const, id, error: r.error, detail: r.data, status: r.status };
       })
     );
+    const results = settled.map(s => s.status === "fulfilled" ? s.value : { ok: false, error: String((s as PromiseRejectedResult).reason) });
     const deleted = results.filter(r => r.ok);
     const failed  = results.filter(r => !r.ok);
     return out({ total: ids.length, deleted: deleted.length, failed: failed.length, results });

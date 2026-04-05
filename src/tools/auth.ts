@@ -62,4 +62,38 @@ export function register(server: McpServer) {
       note: "Use this token with record_test_as_user to test rules as this user",
     });
   });
+
+  /* ── auth_methods ───────────────────────────────────────────────── */
+
+  server.registerTool("auth_methods", {
+    description: [
+      "List available authentication methods for an auth collection.",
+      "Returns which auth methods are enabled: password, OAuth2 (with provider list), OTP, MFA.",
+      "Useful to discover how users can authenticate before testing auth flows.",
+    ].join(" "),
+    inputSchema: {
+      collection: z.string().default("users").describe("Auth collection name or id"),
+    },
+  }, async ({ collection }) => respond(await pbFetch(`/api/collections/${collection}/auth-methods`)));
+
+  /* ── auth_refresh ───────────────────────────────────────────────── */
+
+  server.registerTool("auth_refresh", {
+    description: [
+      "Refresh an existing auth token to extend its validity.",
+      "Pass the current token to get a new token + updated record data.",
+      "Useful when a token is about to expire during a long testing session.",
+    ].join(" "),
+    inputSchema: {
+      collection: z.string().default("users").describe("Auth collection name or id"),
+      token:      z.string().describe("Current valid auth token to refresh"),
+    },
+  }, async ({ collection, token }) => {
+    const res = await pbFetch(`/api/collections/${collection}/auth-refresh`, {
+      method: "POST",
+    }, token);
+    if (!res.ok) return respond(res);
+    const data = res.data as Record<string, unknown>;
+    return out({ token: data.token, record: data.record });
+  });
 }

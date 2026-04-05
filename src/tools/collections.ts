@@ -17,7 +17,14 @@ export function register(server: McpServer) {
       "  Public read, auth write: listRule='', viewRule='', createRule='@request.auth.id != \"\"'",
       "",
       "AUTH collections require passwordAuth option with identityFields.",
-      "VIEW collections require viewQuery SQL and do NOT support indexes or write rules.",
+      "",
+      "VIEW COLLECTIONS: Read-only virtual tables from a SQL SELECT query.",
+      "  - viewQuery is required and MUST include an 'id' column",
+      "  - Fields are auto-generated from the query — do NOT pass fields array",
+      "  - Only listRule and viewRule are allowed (create/update/delete must be null)",
+      "  - No indexes allowed (underlying tables' indexes are used)",
+      "  - Records are read-only via API (GET only)",
+      "  - Example: viewQuery='SELECT p.id, p.title, u.name as author FROM posts p JOIN users u ON p.user = u.id'",
     ].join("\n"),
     inputSchema: {
       name: z.string().describe("Collection name, used as table name. Snake_case, no spaces."),
@@ -111,5 +118,92 @@ export function register(server: McpServer) {
       method: "PUT",
       body: JSON.stringify({ collections, deleteMissing }),
     }));
+  });
+
+  /* ── collection_fields_add ──────────────────────────────────────── */
+
+  server.registerTool("collection_fields_add", {
+    description: [
+      "Add new fields to an existing collection WITHOUT needing to pass the full field list with IDs.",
+      "Fetches the current schema, appends the new fields, and sends the update.",
+      "This is the simplest way to add fields — no need to call schema_collection first.",
+      "Note: You can NOT modify or delete existing fields with this tool (use collection_update for that).",
+    ].join(" "),
+    inputSchema: {
+      collection: z.string().describe("Collection name or id"),
+      fields: FIELD_SCHEMA.describe("New fields to add. Same format as collection_create fields."),
+    },
+  }, async ({ collection, fields }) => {
+    // Fetch current collection schema
+    const colRes = await pbFetch(`/api/collections/${collection}`);
+    if (!colRes.ok) return respond(colRes);
+
+    const current = colRes.data as Record<string, unknown>;
+    const existingFields = (current.fields as unknown[]) ?? [];
+
+    // Append new fields to existing ones
+    const allFields = [...existingFields, ...fields];
+
+    return respond(await pbFetch(`/api/collections/${collection}`, {
+      method: "PATCH",
+      body: JSON.stringify({ fields: allFields }),
+    }));
+  });
+
+  /* ── collection_duplicate ───────────────────────────────────────── */
+
+  server.registerTool("collection_duplicate", {
+    description: [
+      "Clone an existing collection's schema under a new name.",
+      "Copies all fields (without IDs, so PocketBase generates new ones), rules, indexes, and type-specific options.",
+      "Does NOT copy records — only the schema structure.",
+    ].join(" "),
+    inputSchema: {
+      source:  z.string().describe("Source collection name or id to clone from"),
+      newName: z.string().describe("Name for the new collection"),
+    },
+  }, async ({ source, newName }) => {
+    const colRes = await pbFetch(`/api/collections/${source}`);
+    if (!colRes.ok) return respond(colRes);
+
+    const src = colRes.data as Record<string, unknown>;
+
+    // Strip IDs from fields so PocketBase generates new ones
+    const fields = ((src.fields as Record<string, unknown>[]) ?? [])
+      .filter(f => !f.system)
+      .map(({ id: _id, ...rest }) => rest);
+
+    const body: Record<string, unknown> = {
+      name: newName,
+      type: src.type,
+      listRule:   src.listRule,
+      viewRule:   src.viewRule,
+      createRule: src.createRule,
+      updateRule: src.updateRule,
+      deleteRule: src.deleteRule,
+      fields,
+    };
+
+    // Copy type-specific options
+    if (src.type === "auth") {
+      body.authRule     = src.authRule;
+      body.manageRule   = src.manageRule;
+      body.passwordAuth = src.passwordAuth;
+      body.mfa          = src.mfa;
+      body.otp          = src.otp;
+      body.oauth2        = src.oauth2;
+    }
+    if (src.type === "view") {
+      body.viewQuery = src.viewQuery;
+    }
+
+    // Copy indexes, replacing old collection name with new name
+    if (Array.isArray(src.indexes) && src.indexes.length > 0) {
+      body.indexes = (src.indexes as string[]).map(idx =>
+        idx.replace(new RegExp(`\\b${src.name as string}\\b`, "g"), newName)
+      );
+    }
+
+    return respond(await pbFetch("/api/collections", { method: "POST", body: JSON.stringify(body) }));
   });
 }

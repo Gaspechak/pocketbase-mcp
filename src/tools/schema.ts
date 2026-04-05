@@ -48,6 +48,7 @@ export function register(server: McpServer) {
       id: c.id,
       name: c.name,
       type: c.type,
+      ...(c.type === "view" ? { _note: "READ-ONLY view collection (SQL query below)" } : {}),
       system: c.system,
       rules: {
         list:   c.listRule,
@@ -79,11 +80,22 @@ export function register(server: McpServer) {
       relations: relationMap[c.name as string],
     }));
 
-    return out({ totalCollections: result.length, collections: result });
+    // Summarize by type
+    const byType = { base: 0, auth: 0, view: 0 };
+    for (const c of result) {
+      const t = c.type as keyof typeof byType;
+      if (t in byType) byType[t]++;
+    }
+
+    return out({ totalCollections: result.length, byType, collections: result });
   });
 
   server.registerTool("schema_collection", {
-    description: "Get full schema of a single collection: all fields with options, API rules, indexes, auth config.",
+    description: [
+      "Get full schema of a single collection: all fields with id + name + type + options, API rules, indexes, auth config.",
+      "For VIEW collections, also returns the viewQuery SQL and auto-generated fields.",
+      "Use this before collection_update to get field IDs needed for modifying existing fields.",
+    ].join(" "),
     inputSchema: { collection: z.string().describe("Collection name or id") },
   }, async ({ collection }) => respond(await pbFetch(`/api/collections/${collection}`)));
 }

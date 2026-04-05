@@ -123,4 +123,67 @@ export function register(server: McpServer) {
 
     return out({ url, token, protected: isProtected });
   });
+
+  /* ── settings ───────────────────────────────────────────────────── */
+
+  server.registerTool("settings_get", {
+    description: [
+      "Get PocketBase application settings. Superuser only.",
+      "Returns app name, URL, SMTP config, S3 storage config, auth options, and more.",
+    ].join(" "),
+    inputSchema: {},
+  }, async () => respond(await pbFetch("/api/settings")));
+
+  server.registerTool("settings_update", {
+    description: [
+      "Update PocketBase application settings. Superuser only.",
+      "Pass only the settings you want to change — other settings are preserved.",
+      "Common settings: meta.appName, meta.appURL, smtp.enabled, smtp.host, s3.enabled, etc.",
+      "CAUTION: Incorrect settings can break your PocketBase instance.",
+    ].join(" "),
+    inputSchema: {
+      settings: z.record(z.unknown()).describe("Settings object with only the fields to update"),
+      confirm:  z.literal(true).describe("Must explicitly pass true to confirm settings change"),
+    },
+  }, async ({ settings }) => {
+    return respond(await pbFetch("/api/settings", {
+      method: "PATCH",
+      body: JSON.stringify(settings),
+    }));
+  });
+
+  /* ── backup extras ──────────────────────────────────────────────── */
+
+  server.registerTool("backup_restore", {
+    description: [
+      "Restore PocketBase from a previously created backup. DANGEROUS — this replaces the current database!",
+      "First call backup_list to see available backups and get the key (filename).",
+      "The server will restart after a successful restore.",
+    ].join(" "),
+    inputSchema: {
+      key:     z.string().describe("Backup filename/key from backup_list, e.g. 'pb_backup_20240101.zip'"),
+      confirm: z.literal(true).describe("Must explicitly pass true to confirm restore"),
+    },
+  }, async ({ key }) => {
+    const res = await pbFetch(`/api/backups/${encodeURIComponent(key)}/restore`, { method: "POST" });
+    if (res.status === 204 || res.ok) return out({ restored: true, key, note: "Server may restart." });
+    return respond(res);
+  });
+
+  server.registerTool("backup_download_url", {
+    description: [
+      "Generate a download URL for a backup file.",
+      "First call backup_list to see available backups and get the key.",
+      "The URL includes a short-lived file token for authorization.",
+    ].join(" "),
+    inputSchema: {
+      key: z.string().describe("Backup filename/key from backup_list"),
+    },
+  }, async ({ key }) => {
+    const tokenRes = await pbFetch("/api/files/token", { method: "POST" });
+    let token: string | undefined;
+    if (tokenRes.ok) token = (tokenRes.data as Record<string, unknown>).token as string;
+    const url = `${PB_URL}/api/backups/${encodeURIComponent(key)}` + (token ? `?token=${token}` : "");
+    return out({ url, token });
+  });
 }
