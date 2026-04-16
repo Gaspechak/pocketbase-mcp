@@ -5,7 +5,7 @@
     "type": "git",
     "url": "https://github.com/Gaspechak/pocketbase-mcp.git"
   },
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MCP server for PocketBase — full database management from any AI assistant",
   "type": "module",
   "bin": {
